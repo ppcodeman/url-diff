@@ -5,18 +5,91 @@ A detailed description of url_params.
 """
 
 import argparse
+import copy
+import logging
 import sys
 
-class Url_Differ(object):
+class Error(Exception):
+  """Base exception class."""
+  pass
+
+class ParamDiffTypeError(Error):
+  """Raised when an incorrect diff type used."""
+  pass
+
+class ParamDiffEntry(object):
+  """Represents difference of 2 URL params with same name."""
+  LEFT_ONLY = 1
+  RIGHT_ONLY = 2
+  BOTH_DIFFER = 3
+  LEFT_VALUE_FORMAT = '{0}\n< {1}'
+  RIGHT_VALUE_FORMAT = '{0}\n> {1}'
+
+  def __init__(self, name, left_value, right_value, diff_type):
+    self._name = name
+    self._left_val = left_value
+    self._right_val = right_value
+    try:
+      if self._valid_diff_type(diff_type):
+        self._type = diff_type
+    except ParamDiffTypeError:
+      logging.error("Incorrect diff type: %s", diff_type)
+      self._type = self.BOTH_DIFFER
+
+  def _valid_diff_type(self, diff_type):
+    if (diff_type != self.LEFT_ONLY and diff_type != self.RIGHT_ONLY and
+        diff_type != self.BOTH_DIFFER):
+      raise ParamDiffTypeError('%s is not a valid diff type. ', diff_type)
+    return True
+
+  @property
+  def name(self):
+    return self._name
+
+  @property
+  def left_val(self):
+    return self._left_val
+
+  @property
+  def right_val(self):
+    return self._right_val
+
+  @property
+  def diff_type(self):
+    return self._type
+
+  def __str__(self):
+    ret = self._name
+    if self._type == self.LEFT_ONLY or self._type == self.BOTH_DIFFER:
+      ret = self.LEFT_VALUE_FORMAT.format(ret, self._left_val)
+    if self._type == self.RIGHT_ONLY or self._type == self.BOTH_DIFFER:
+      ret = self.RIGHT_VALUE_FORMAT.format(ret, self._right_val)
+    return ret
+
+
+
+class UrlDiffer(object):
 
   PATH_DELIM = '?'
   PARAM_DELIM = '&'
   NAME_VAL_DELIM = '='
 
-  def __init__(self, left_url, right_url, names_only=False):
+
+  def __init__(self, left_url, right_url, names_only=False, hostnames=False):
     self._left_url = self._normalize_url(left_url)
     self._right_url = self._normalize_url(right_url)
     self._names_only = names_only
+    self._do_diff()
+
+  def __str__(self):
+    ret = []
+    for diff in self._diffs:
+      if self._names_only:
+        ret.append(diff.name)
+      else:
+        ret.append(str(diff))
+    join_delim = '\n' if self._names_only else '\n\n'
+    return join_delim.join(ret)
 
   def _normalize_url(self, url):
     """Strips white space, and removes all chars after #"""
@@ -39,47 +112,46 @@ class Url_Differ(object):
       param_dict[partitioned_param[0]] = partitioned_param[2]
     return param_dict
 
-  def _diff_params(self, left_params, right_params, names_only=False):
+  def _diff_params(self, left_params, right_params):
     """Returns a list of the diffence between dicts on key/values.
     """
     diffs = []
     for left_key in left_params.iterkeys():
       if left_key in right_params:
         if left_params[left_key] != right_params[left_key]:
-          diffs.append(left_key)
-          if not names_only:
-            diffs.append('< %s' % (left_params[left_key]))
-            diffs.append('> %s' % (right_params[left_key]))
-          diffs.append('')
+          diffs.append(ParamDiffEntry(
+            left_key, left_params[left_key], right_params[left_key],
+            ParamDiffEntry.BOTH_DIFFER))
       else:
-        diffs.append(left_key)
-        if not names_only:
-          diffs.append('< %s' % (left_params[left_key]))
-        diffs.append('')
+        diffs.append(ParamDiffEntry(
+          left_key, left_params[left_key], None, ParamDiffEntry.LEFT_ONLY))
 
     for right_key in right_params.iterkeys():
       if right_key not in left_params:
-        diffs.append(right_key)
-        if not names_only:
-          diffs.append('> %s' % (right_params[right_key]))
-        diffs.append('')
+        diffs.append(ParamDiffEntry(
+          right_key, None, right_params[right_key], ParamDiffEntry.RIGHT_ONLY))
 
     return diffs
 
-  def __str__(self):
-    left_params_dict = self._get_params(self._left_url)
-    right_params_dict = self._get_params(self._right_url)
-    diffs = self._diff_params(left_params_dict, right_params_dict, self._names_only)
-    return '\n'.join(diffs)
+  def _do_diff(self):
+    self._left_params_dict = self._get_params(self._left_url)
+    self._right_params_dict = self._get_params(self._right_url)
+    self._diffs = self._diff_params(self._left_params_dict, self._right_params_dict)
 
+  def left_params(self):
+    """Returns a deep coy of the left params dict."""
+    return copy.deepcopy(self._left_params_dict)
 
-  def print_diff(self):
-    print self
+  def right_params(self):
+    """Returns a deep coy of the left params dict."""
+    return copy.deepcopy(self._right_params_dict)
 
+  def are_different(self):
+    """Returns True if URLs differ, else false."""
+    return len(self._diffs) != 0
 
-def print_usage(self):
-  """Prints intended usage."""
-  print "%s: <flags> url url" % (self.__class__.__name__)
+  def diff(self):
+    return copy.deepcopy(self._diffs)
 
 
 def main():
@@ -87,7 +159,7 @@ def main():
   # TODO(macpd): usage string
   # TODO(macpd): provide option to url decode params before comparison
   # TODO(macpd): provide option to diff case insensitively
-  arg_parser = argparse.ArgumentParser()
+  arg_parser = argparse.ArgumentParser(description='diff parameters of 2 URLs')
   # TODO(macpd): match domain and hostname
   arg_parser.add_argument('--hostname', default=False, required=False,
       help='also diff URL hostname', action='store_true', dest='diff_hostname')
@@ -98,10 +170,12 @@ def main():
 
   args = arg_parser.parse_args()
 
-  differ = Url_Differ(args.left_url, args.right_url, names_only=args.names_only)
-  print differ
-  # differ.print_diff()
+  differ = UrlDiffer(args.left_url, args.right_url, names_only=args.names_only,
+      hostnames=args.diff_hostname)
 
+  print differ
+
+  sys.exit(1 if differ.are_different() else 0)
 
 if __name__ == '__main__':
   main()
