@@ -60,16 +60,18 @@ class ParamDiffEntry(object):
     return ret
 
 
-
 class UrlDiffer(object):
+  """Object to diff URLs.
+
+  Diffs URLs upon intialization."""
 
   PATH_DELIM = '?'
   PARAM_DELIM = '&'
   NAME_VAL_DELIM = '='
   SCHEME_DELIM = '://'
 
-
   def __init__(self, left_url, right_url, names_only=False, hostnames=False):
+    """Initializes object and performs URL diffing."""
     self._left_url = self._normalize_url(left_url)
     self._right_url = self._normalize_url(right_url)
     self._names_only = names_only
@@ -171,6 +173,7 @@ class UrlDiffer(object):
     return diffs
 
   def _do_diff(self):
+    """Performs all appropriate diffing operations."""
     if self._wants_hostname_diff:
       self._left_hostname = self._get_hostname(self._left_url)
       self._right_hostname = self._get_hostname(self._right_url)
@@ -192,6 +195,7 @@ class UrlDiffer(object):
     """Returns True if URLs differ, else false."""
     return len(self._diffs) != 0
 
+  @property
   def diff(self):
     return copy.deepcopy(self._diffs)
 
@@ -201,7 +205,9 @@ def main():
   # TODO(macpd): usage string
   # TODO(macpd): provide option to url decode params before comparison
   # TODO(macpd): provide option to diff case insensitively
-  arg_parser = argparse.ArgumentParser(description='show the difference between 2 urls. Inspired by the unix utility diff')
+  arg_parser = argparse.ArgumentParser(
+      description='show the difference between 2 urls. Inspired by the unix utility diff',
+      epilog='Currenty this tool discards everything after # if present.')
   arg_parser.add_argument('--hostname', default=False, required=False,
       help='also diff URL hostname', action='store_true', dest='diff_hostname')
   arg_parser.add_argument('--names', '-n', default=False, required=False,
