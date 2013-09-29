@@ -1,7 +1,8 @@
 #!/usr/bin/python2
-"""One-line documentation for url_params module.
+"""A tool to show the differnce in URLs.
 
-A detailed description of url_params.
+A tool for showing the differnces between URLs.  This is inspired by the unix
+utility diff.
 """
 
 import argparse
