@@ -22,6 +22,7 @@ class HostnameParseError(Error):
   """Raised when unable to parse hostname from URL."""
   pass
 
+# TODO(macpd): investigate making this a namedtuple
 class ParamDiffEntry(object):
   """Represents difference of 2 URL params with same name."""
   LEFT_ONLY = 1
