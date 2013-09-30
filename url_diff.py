@@ -28,13 +28,16 @@ class ParamDiffEntry(object):
   LEFT_ONLY = 1
   RIGHT_ONLY = 2
   BOTH_DIFFER = 3
-  LEFT_VALUE_FORMAT = '{0}\n< {1}'
-  RIGHT_VALUE_FORMAT = '{0}\n> {1}'
+  left_value_format = '{0}\n< {1}'
+  right_value_format = '{0}\n> {1}'
 
-  def __init__(self, name, left_value, right_value, diff_type):
+  def __init__(self, name, left_value, right_value, diff_type, unified):
     self._name = name
     self._left_val = left_value
     self._right_val = right_value
+    if unified:
+      self.left_value_format = '{0}\n- {1}'
+      self.right_value_format = '{0}\n+ {1}'
     try:
       if self._valid_diff_type(diff_type):
         self._type = diff_type
@@ -55,9 +58,9 @@ class ParamDiffEntry(object):
   def __str__(self):
     ret = self._name
     if self._type == self.LEFT_ONLY or self._type == self.BOTH_DIFFER:
-      ret = self.LEFT_VALUE_FORMAT.format(ret, self._left_val)
+      ret = self.left_value_format.format(ret, self._left_val)
     if self._type == self.RIGHT_ONLY or self._type == self.BOTH_DIFFER:
-      ret = self.RIGHT_VALUE_FORMAT.format(ret, self._right_val)
+      ret = self.right_value_format.format(ret, self._right_val)
     return ret
 
 
@@ -71,12 +74,13 @@ class UrlDiffer(object):
   NAME_VAL_DELIM = '='
   SCHEME_DELIM = '://'
 
-  def __init__(self, left_url, right_url, names_only=False, hostnames=False):
+  def __init__(self, left_url, right_url, names_only=False, hostnames=False, unified=False):
     """Initializes object and performs URL diffing."""
     self._left_url = self._normalize_url(left_url)
     self._right_url = self._normalize_url(right_url)
     self._names_only = names_only
     self._wants_hostname_diff = hostnames
+    self._unified = unified
     self._diffs = []
     self._do_diff()
 
@@ -128,7 +132,7 @@ class UrlDiffer(object):
     else:
       self._hostnames_differ = True
       self._diffs.append(ParamDiffEntry('Hostname', left, right,
-          ParamDiffEntry.BOTH_DIFFER))
+          ParamDiffEntry.BOTH_DIFFER, self._unified))
 
     return self._hostnames_differ
 
@@ -161,15 +165,15 @@ class UrlDiffer(object):
         if left_params[left_key] != right_params[left_key]:
           diffs.append(ParamDiffEntry(
             left_key, left_params[left_key], right_params[left_key],
-            ParamDiffEntry.BOTH_DIFFER))
+            ParamDiffEntry.BOTH_DIFFER, self._unified))
       else:
         diffs.append(ParamDiffEntry(
-          left_key, left_params[left_key], None, ParamDiffEntry.LEFT_ONLY))
+          left_key, left_params[left_key], None, ParamDiffEntry.LEFT_ONLY, self._unified))
 
     for right_key in right_params.iterkeys():
       if right_key not in left_params:
         diffs.append(ParamDiffEntry(
-          right_key, None, right_params[right_key], ParamDiffEntry.RIGHT_ONLY))
+          right_key, None, right_params[right_key], ParamDiffEntry.RIGHT_ONLY, self._unified))
 
     return diffs
 
@@ -213,13 +217,15 @@ def main():
       help='also diff URL hostname', action='store_true', dest='diff_hostname')
   arg_parser.add_argument('--names', '-n', default=False, required=False,
       help='only diff URL parameter names.', action='store_true', dest='names_only')
+  arg_parser.add_argument('--unified', '-u', default=False, required=False,
+      help='use unified mode + / - instead of < >', action='store_true', dest='unified')
   arg_parser.add_argument('left_url', type=str, help='URL to diff against.  logically handled as the left argurmnt of diff.', metavar='<left URL>')
   arg_parser.add_argument('right_url', type=str, help='URL to diff against.  logically handled as the left argurmnt of diff.', metavar='<right URL>')
 
   args = arg_parser.parse_args()
 
   differ = UrlDiffer(args.left_url, args.right_url, names_only=args.names_only,
-      hostnames=args.diff_hostname)
+      hostnames=args.diff_hostname, unified=args.unified)
 
   print differ
 
