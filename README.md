@@ -40,9 +40,10 @@ positional arguments:
   <right URL>  URL to diff against. logically handled as the left argurment of diff.
 
 optional arguments:
-  -h, --help   show this help message and exit
-  --hostname   also diff URL hostname
-  --names, -n  only diff URL parameter names.
+  -h, --help     show this help message and exit
+  --hostname     also diff URL hostname
+  --names, -n    only diff URL parameter names.
+  --unified, -u  use unified mode + / - instead of < >
 
 Currenty this tool discards everything after # if present.
 
